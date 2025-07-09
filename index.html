@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/progress/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="website">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="website_of_progress">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>website_of_progress</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Summernote CSS for html_editor_enhanced -->
+  <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- Flutter App -->
+<script src="flutter_bootstrap.js" async></script>
+
+<!-- Jitsi Meet External API -->
+<script src="https://meet.jit.si/external_api.js"></script>
+
+<!-- YouTube iframe support -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<!-- Summernote JS -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
+
+<!-- ✅ Firebase Messaging Service Worker Registration (added) -->
+<script>
+  if ('serviceWorker' in navigator) {
+    const swPath = window.location.hostname === 'localhost'
+      ? '/firebase-messaging-sw.js'
+      : '/firebase-messaging-sw.js'; // Adjust if hosted in a subfolder
+
+    navigator.serviceWorker.register(swPath)
+      .then((registration) => {
+        console.log('✅ [index.html] Service Worker registered with scope:', registration.scope);
+      })
+      .catch((err) => {
+        console.error('❌ [index.html] Service Worker registration failed:', err);
+      });
+  } else {
+    console.warn('⚠️ Service Workers are not supported in this browser.');
+  }
+</script>
+
+<!-- green color button -->
+<script>
+  let audioContext, analyser, mic;
+
+  function startMicVolumeListener(callback) {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      mic = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+
+      let dataArray = new Uint8Array(analyser.frequencyBinCount);
+      mic.connect(analyser);
+
+      function updateVolume() {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        let volume = sum / dataArray.length;
+        callback(volume); // Pass volume back to Dart
+        requestAnimationFrame(updateVolume);
+      }
+
+      updateVolume();
+    }).catch(err => console.error('Mic access denied', err));
+  }
+</script>
+
+<!-- waveform button -->
+<canvas id="micWaveCanvas" width="200" height="100" style="display:none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 100px;"></canvas>
+
+<script>
+  let audioContextWave, analyserWave, dataArrayWave, sourceWave, micStream;
+  const canvas = document.getElementById('micWaveCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function startWaveformStream() {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      micStream = stream;
+      audioContextWave = new (window.AudioContext || window.webkitAudioContext)();
+      analyserWave = audioContextWave.createAnalyser();
+      sourceWave = audioContextWave.createMediaStreamSource(stream);
+      sourceWave.connect(analyserWave);
+      analyserWave.fftSize = 256;
+
+      const bufferLength = analyserWave.frequencyBinCount;
+      dataArrayWave = new Uint8Array(bufferLength);
+
+      canvas.style.display = 'block';
+
+      drawWaveform();
+    }).catch((err) => {
+      console.error('Mic error:', err);
+    });
+  }
+
+  function drawWaveform() {
+    requestAnimationFrame(drawWaveform);
+
+    analyserWave.getByteTimeDomainData(dataArrayWave);
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#00ff00';
+    ctx.beginPath();
+
+    const sliceWidth = canvas.width / dataArrayWave.length;
+    let x = 0;
+    for (let i = 0; i < dataArrayWave.length; i++) {
+      const v = dataArrayWave[i] / 128.0;
+      const y = (v * canvas.height) / 2;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      x += sliceWidth;
+    }
+
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+  }
+
+  function stopWaveformStream() {
+    canvas.style.display = 'none';
+    if (micStream) {
+      micStream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContextWave) {
+      audioContextWave.close();
+    }
+  }
+
+  window.startWaveformStream = startWaveformStream;
+  window.stopWaveformStream = stopWaveformStream;
+</script>
+
+<!-- PDF.js support -->
+<script type="module" async>
+  import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.worker.min.mjs";
+</script>
+
+</body>
+</html>
